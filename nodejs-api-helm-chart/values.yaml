@@ -1,0 +1,39 @@
+replicaCount: 1
+
+image:
+  repository: anushka0104/nodejs-crud-api
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+
+env:
+  DB_HOST: mongodb.default.svc.cluster.local
+  DB_PORT: 27017
+  DB_NAME: testdb
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+ingress:
+  enabled: false
+  annotations: {}
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
