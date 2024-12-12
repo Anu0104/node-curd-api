@@ -1,5 +1,5 @@
-Node-CRUD-API/node_modules
-Node-CRUD-API/package-lock.json
-Node-CURD-API/terraform-nodejs-api-infra/terraform.tfstate
-Node-CURD-API/terraform-nodejs-api-infra/terraform.tfstate.backup
-Node-CURD-API/terraform-nodejs-api-infra/.terraform
+nodejs-crud-docker/node_modules/
+nodejs-crud-docker/package-lock.json
+terraform-nodejs-api-infra/terraform.tfstate
+terraform-nodejs-api-infra/terraform.tfstate.backup
+terraform-nodejs-api-infra/.terraform
