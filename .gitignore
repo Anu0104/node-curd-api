@@ -3,3 +3,4 @@ nodejs-crud-docker/package-lock.json
 terraform-nodejs-api-infra/terraform.tfstate
 terraform-nodejs-api-infra/terraform.tfstate.backup
 terraform-nodejs-api-infra/.terraform
+terraform-nodejs-api-infra/.terraform.lock.hcl
