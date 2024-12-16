@@ -1,34 +1,64 @@
-# module "aws_load_balancer_controller_irsa_role" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-#   version = "5.3.1"
 
-#   role_name = "aws-load-balancer-controller"
+# ##########################################################################
+# # AWS EKS LoadBalancer Role
+# ##########################################################################
 
-#   attach_load_balancer_controller_policy = true
+# resource "aws_iam_policy" "load_balancer_controller_policy" {
+#   name        = "AWSLoadBalancerControllerIAMPolicy"
+#   path        = "/"
+#   description = "My AWSLoadBalancerControllerIAMPolicy policy"
 
-#   oidc_providers = {
-#     ex = {
-#       provider_arn               = module.eks.oidc_provider_arn
-#       namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
-#     }
-#   }
+#   policy = file("policy/aws_load_balancer_controller_policy.json")
+#   depends_on = [ module.eks ]
+# }
+
+# resource "aws_iam_role" "load_balancer_controller_role" {
+#   name        = "LoadBalancerControllerRole"
+#   description = "Amazon EKS - Load Balancer Controller role."
+#   path        = "/"
+#   assume_role_policy = jsonencode({
+
+
+#     Version = "2012-10-17",
+#     Statement = [
+#       {
+#         Effect = "Allow",
+#         Principal = {
+#           Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/oidc.eks.${var.region}.amazonaws.com/id/${split("/", module.eks.cluster_oidc_issuer_url)[4]}"
+#         },
+#         Action = "sts:AssumeRoleWithWebIdentity",
+#         Condition = {
+#           StringEquals = {
+#             "oidc.eks.${var.region}.amazonaws.com/id/${split("/", module.eks.cluster_oidc_issuer_url)[4]}:aud" : "sts.amazonaws.com",
+#             "oidc.eks.${var.region}.amazonaws.com/id/${split("/", module.eks.cluster_oidc_issuer_url)[4]}:sub" : "system:serviceaccount:kube-system:aws-load-balancer-controller"
+#           }
+#         }
+#       }
+#     ]
+#   })
+
+#   force_detach_policies = false
+#   managed_policy_arns = [
+#     aws_iam_policy.load_balancer_controller_policy.arn
+#   ]
+#   depends_on = [ aws_iam_policy.load_balancer_controller_policy ]
 # }
 
 # resource "kubernetes_service_account" "service-account" {
-#  metadata {
-#      name      = "aws-load-balancer-controller"
-#      namespace = "kube-system"
-#      labels = {
-#      "app.kubernetes.io/name"      = "aws-load-balancer-controller"
-#      "app.kubernetes.io/component" = "controller"
-#      }
-#      annotations = {
-#      "eks.amazonaws.com/role-arn"               = module.aws_load_balancer_controller_irsa_role.iam_role_arn
-#      "eks.amazonaws.com/sts-regional-endpoints" = "true"
-#      }
-#  }
-#  depends_on = [ module.aws_load_balancer_controller_irsa_role ]
-#  }
+#   metadata {
+#     name      = "aws-load-balancer-controller"
+#     namespace = "kube-system"
+#     labels = {
+#       "app.kubernetes.io/name"      = "aws-load-balancer-controller"
+#       "app.kubernetes.io/component" = "controller"
+#     }
+#     annotations = {
+#       "eks.amazonaws.com/role-arn"               = aws_iam_role.load_balancer_controller_role.arn
+#       "eks.amazonaws.com/sts-regional-endpoints" = "true"
+#     }
+#   }
+#   depends_on = [ aws_iam_role.load_balancer_controller_role ]
+# }
 
 # # terraform/helm-load-balancer-controller.tf
 
@@ -46,13 +76,13 @@
 #   }
 
 #   set {
-#      name  = "serviceAccount.create"
-#      value = "false"
+#     name  = "serviceAccount.create"
+#     value = "false"
 #   }
 
 #   set {
-#      name  = "serviceAccount.name"
-#      value = "aws-load-balancer-controller"
+#     name  = "serviceAccount.name"
+#     value = "aws-load-balancer-controller"
 #   }
 
 #   set {
@@ -69,5 +99,5 @@
 #     name  = "affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]"
 #     value = "load-balancer-controller"
 #   }
-#   depends_on = [ kubernetes_service_account.service-account ]
+#   depends_on = [kubernetes_service_account.service-account]
 # }

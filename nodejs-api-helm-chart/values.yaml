@@ -10,7 +10,7 @@ service:
   port: 3000
 
 env:
-  DB_HOST: mongodb.default.svc.cluster.local
+  DB_HOST: mongodb.mongodb.svc.cluster.local
   DB_PORT: 27017
   DB_NAME: testdb
 
@@ -29,11 +29,17 @@ tolerations: []
 affinity: {}
 
 ingress:
-  enabled: false
-  annotations: {}
+  enabled: true
+  ingressClass: alb
+  annotations: 
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/load-balancer-name: nodejs-api
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/subnets: subnet-0e948e10b35b653b1, subnet-04dc34849fedef111
   hosts:
-    - host: api.example.com
+    - host:
       paths:
-        - path: /
-          pathType: ImplementationSpecific
-  tls: []
+        - path: /api/products
+          pathType: Prefix

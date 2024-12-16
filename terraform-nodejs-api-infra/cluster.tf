@@ -9,11 +9,12 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = "1.29"
 
-  cluster_endpoint_private_access = true
-  cluster_endpoint_public_access  = true
+  cluster_endpoint_public_access           = true
+  enable_cluster_creator_admin_permissions = true
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  vpc_id                   = module.vpc.vpc_id
+  subnet_ids               = module.vpc.public_subnets
+  control_plane_subnet_ids = module.vpc.public_subnets
 
   enable_irsa = true
 
@@ -26,6 +27,10 @@ module "eks" {
     }
     vpc-cni = {
       most_recent = true
+    }
+    aws-ebs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = "${aws_iam_role.ebs_csi_driver_role.arn}"
     }
   }
   eks_managed_node_groups = {
@@ -83,81 +88,53 @@ module "eks" {
   depends_on = [module.vpc]
 }
 
-# module "allow_eks_access_iam_policy" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
-#   version = "5.3.1"
+resource "aws_security_group_rule" "eks_cluster" {
+  security_group_id = module.eks.cluster_security_group_id
+  protocol          = "-1"               # -1 means all protocols
+  from_port         = 0                  # Allow all ports
+  to_port           = 65535              # Allow all ports
+  type              = "ingress"
+  description       = "Allow all inbound traffic to the EKS cluster"
+  cidr_blocks       = ["0.0.0.0/0"]      # Allow traffic from all IPs
+  depends_on        = [module.eks]
+}
 
-#   name          = "allow-eks-access"
-#   create_policy = true
+##########################################################################
+# AWS EKS EBS CSI DRIVER ROLE
+##########################################################################
+data "aws_caller_identity" "current" {}
 
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = [
-#           "eks:DescribeCluster",
-#         ]
-#         Effect   = "Allow"
-#         Resource = "*"
-#       },
-#     ]
-#   })
-# }
+data "aws_iam_policy" "ebs_csi_driver_policy" {
+  name = "AmazonEBSCSIDriverPolicy"
+}
 
-# module "eks_admins_iam_role" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role"
-#   version = "5.3.1"
+resource "aws_iam_role" "ebs_csi_driver_role" {
+  name        = "AmazonEBSCSIDriverRole"
+  description = "Amazon EKS - EBS CSI Driver role."
+  path        = "/"
+  assume_role_policy = jsonencode({
 
-#   role_name         = "eks-admin"
-#   create_role       = true
-#   role_requires_mfa = false
 
-#   custom_role_policy_arns = [module.allow_eks_access_iam_policy.arn]
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/oidc.eks.${var.region}.amazonaws.com/id/${split("/", module.eks.cluster_oidc_issuer_url)[4]}"
+        },
+        Action = "sts:AssumeRoleWithWebIdentity",
+        Condition = {
+          StringEquals = {
+            "oidc.eks.${var.region}.amazonaws.com/id/${split("/", module.eks.cluster_oidc_issuer_url)[4]}:aud" : "sts.amazonaws.com",
+            "oidc.eks.${var.region}.amazonaws.com/id/${split("/", module.eks.cluster_oidc_issuer_url)[4]}:sub" : "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+          }
+        }
+      }
+    ]
+  })
+  force_detach_policies = false
 
-#   trusted_role_arns = [
-#     "arn:aws:iam::${module.vpc.vpc_owner_id}:root"
-#   ]
-# }
-
-# module "eks_iam_user" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-user"
-#   version = "5.3.1"
-
-#   name                          = "eks-user"
-#   create_iam_access_key         = false
-#   create_iam_user_login_profile = false
-
-#   force_destroy = true
-# }
-
-# module "allow_assume_eks_admins_iam_policy" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
-#   version = "5.3.1"
-
-#   name          = "allow-assume-eks-admin-iam-role"
-#   create_policy = true
-
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = [
-#           "sts:AssumeRole",
-#         ]
-#         Effect   = "Allow"
-#         Resource = module.eks_admins_iam_role.iam_role_arn
-#       },
-#     ]
-#   })
-# }
-
-# module "eks_admins_iam_group" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-group-with-policies"
-#   version = "5.3.1"
-
-#   name                              = "eks-admin"
-#   attach_iam_self_management_policy = false
-#   create_group                      = true
-#   group_users                       = [ module.eks_iam_user.iam_user_name ]
-#   custom_group_policy_arns          = [module.allow_assume_eks_admins_iam_policy.arn]
-# }
+  managed_policy_arns = [
+    data.aws_iam_policy.ebs_csi_driver_policy.arn
+  ]
+}

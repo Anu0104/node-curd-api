@@ -3,7 +3,7 @@ name: Build and Push Images
 on:
   push:
     branches:
-      - add-nodejs-crud-api
+      - main
   
 jobs:
   docker-hub:
