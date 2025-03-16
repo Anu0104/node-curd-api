@@ -1,0 +1,33 @@
+version: '3.8'
+services:
+  mongodb:
+    image: mongo
+    container_name: mongodb-container
+    restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=adminpassword
+    ports:
+      - "27017:27017"
+    networks:
+      - node-curd-api
+
+  nodejs:
+    build: .
+    container_name: nodejs-container
+    environment:
+    - DB_USER=admin
+    - DB_PASSWORD=adminpassword
+    - DB_HOST=mongodb-container
+    - DB_PORT=27017
+    - DB_NAME=testdb
+    depends_on:
+      - mongodb
+    networks:
+      - node-curd-api
+    ports:
+      - "3000:3000"
+
+networks:
+  node-curd-api:
+    driver: bridge
